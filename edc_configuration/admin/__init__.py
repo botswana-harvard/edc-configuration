@@ -1,1 +1,2 @@
 from .global_configuration_admin import GlobalConfigurationAdmin
+from .subject_configuration_admin import SubjectConfigurationAdmin
