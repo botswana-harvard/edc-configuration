@@ -2,7 +2,7 @@
 
 in urls.py for edc-sample:
 
-    from apps.sample.app_configuration.classes import app_configuration
+    from edc_sample.sample.app_configuration.classes import app_configuration
     
     app_configuration.prepare()
 
