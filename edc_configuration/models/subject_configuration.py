@@ -3,7 +3,7 @@ from django.db import models
 from django.core.exceptions import ImproperlyConfigured
 from edc_base.model.models import BaseUuidModel
 from edc_appointment.choices import APPT_STATUS, APPT_TYPE
-from edc_appointment.constants import NEW
+from edc_constants.constants import NEW
 try:
     from edc_sync.mixins import SyncMixin
 except ImportError:
