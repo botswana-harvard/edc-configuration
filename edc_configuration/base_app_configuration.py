@@ -4,9 +4,9 @@ from django.core.exceptions import MultipleObjectsReturned
 
 from edc.core.bhp_content_type_map.classes import ContentTypeMapHelper
 from edc.export.helpers import ExportHelper
-from edc.lab.lab_clinic_api.models import AliquotType, Panel
-from edc.lab.lab_packing.models import Destination
-from edc.lab.lab_profile.classes import site_lab_profiles
+from edc_lab.lab_clinic_api.models import AliquotType, Panel
+from edc_lab.lab_packing.models import Destination
+from edc_lab.lab_profile.classes import site_lab_profiles
 from edc.notification.helpers import NotificationHelper
 from edc.subject.entry.models import RequisitionPanel
 from edc_appointment.models import Holiday
@@ -47,7 +47,6 @@ class BaseAppConfiguration(object):
         ContentTypeMapHelper().sync()
         self.update_global()
         self.update_or_create_consent_type()
-        self.update_or_create_study_variables()
         self.update_or_create_lab_clinic_api()
         self.update_or_create_lab()
         self.update_or_create_labeling()
