@@ -1,21 +1,17 @@
-import json
+from __future__ import print_function
 
-from django.apps import apps
-from django.db.utils import IntegrityError
 from django.core.exceptions import MultipleObjectsReturned
-from django.utils.encoding import force_text
 
-from edc_content_type_map.classes import ContentTypeMapHelper
-from edc_content_type_map.models import ContentTypeMap
-from edc_export.helpers import ExportHelper
-from edc_notification.helpers import NotificationHelper
-from edc_lab.lab_clinic_api.models import AliquotType, Panel
-from edc_lab.lab_profile.classes import site_lab_profiles
-from edc_lab.lab_packing.models import Destination
-from edc_notification.models import NotificationPlan
+from edc.core.bhp_content_type_map.classes import ContentTypeMapHelper
+from edc.export.helpers import ExportHelper
+from edc.lab.lab_clinic_api.models import AliquotType, Panel
+from edc.lab.lab_packing.models import Destination
+from edc.lab.lab_profile.classes import site_lab_profiles
+from edc.notification.helpers import NotificationHelper
+from edc.subject.entry.models import RequisitionPanel
+from edc.utils import datatype_to_string
 from edc_appointment.models import Holiday
-from edc_consent.models import ConsentCatalogue
-from edc_entry.models import RequisitionPanel
+from edc_consent.models.consent_type import ConsentType
 
 from lis.labeling.models import LabelPrinter, ZplTemplate, Client
 
@@ -49,8 +45,8 @@ class BaseAppConfiguration(object):
         ContentTypeMapHelper().populate()
         ContentTypeMapHelper().sync()
         self.update_global()
+        self.update_or_create_consent_type()
         self.update_or_create_study_variables()
-        self.update_or_create_consent_catalogue()
         self.update_or_create_lab_clinic_api()
         self.update_or_create_lab()
         self.update_or_create_labeling()
@@ -174,25 +170,6 @@ class BaseAppConfiguration(object):
                     profile_item_model.objects.create(
                         profile=profile, aliquot_type=aliquot_type, volume=item.volume, count=item.count)
 
-    def update_or_create_study_variables(self, site_code=None):
-        """Updates configuration in the :mod:`bhp_variables` module."""
-        if StudySpecific.objects.all().count() == 0:
-            StudySpecific.objects.create(**self.study_variables_setup)
-        else:
-            study_specifics = StudySpecific.objects.all()
-            study_specifics.update(**self.study_variables_setup)
-            for study_specific in study_specifics:
-                # This extra step is required so that signals can fire. Queryset .update() does to fire any signals.
-                study_specific.save()
-        try:
-            StudySite.objects.get(site_name=self.study_site_setup.get('site_name'))
-        except StudySite.DoesNotExist:
-            try:
-                StudySite.objects.create(**self.study_site_setup)
-            except IntegrityError:
-                StudySite.objects.get(site_code=self.study_site_setup.get('site_code')).delete()
-                StudySite.objects.create(**self.study_site_setup)
-
     def update_or_create_labeling(self):
         """Updates configuration in the :mod:`labeling` module."""
 
@@ -209,7 +186,7 @@ class BaseAppConfiguration(object):
                     cups_server_hostname=printer_setup.cups_server_hostname,
                     cups_server_ip=printer_setup.cups_server_ip,
                     default=printer_setup.default,
-                    )
+                )
         for client_setup in self.labeling_setup.get('client', []):
             try:
                 client = Client.objects.get(name=client_setup.hostname)
@@ -221,7 +198,7 @@ class BaseAppConfiguration(object):
                     name=client_setup.hostname,
                     label_printer=LabelPrinter.objects.get(cups_printer_name=client_setup.printer_name,
                                                            cups_server_hostname=client_setup.cups_hostname),
-                    )
+                )
         for zpl_template_setup in self.labeling_setup.get('zpl_template', []):
             try:
                 zpl_template = ZplTemplate.objects.get(name=zpl_template_setup.name)
@@ -233,40 +210,14 @@ class BaseAppConfiguration(object):
                     name=zpl_template_setup.name,
                     template=zpl_template_setup.template,
                     default=zpl_template_setup.default,
-                    )
-
-    def update_or_create_consent_catalogue(self):
-        """Updates configuration in the :mod:`consent` module."""
-
-        for catalogue_setup in self.consent_catalogue_list:
-            content_type_map = ContentTypeMap.objects.get(model=catalogue_setup.get('content_type_map'))
-            try:
-                consent_catalogue = ConsentCatalogue.objects.get(
-                    name=catalogue_setup.get('name'),
-                    version=catalogue_setup.get('version'))
-                consent_catalogue.content_type_map = content_type_map
-                consent_catalogue.consent_type = catalogue_setup.get('consent_type')
-                consent_catalogue.start_datetime = catalogue_setup.get('start_datetime')
-                consent_catalogue.end_datetime = catalogue_setup.get('end_datetime')
-                consent_catalogue.add_for_app = catalogue_setup.get('add_for_app')
-                consent_catalogue.save()
-            except ConsentCatalogue.DoesNotExist:
-                ConsentCatalogue.objects.create(
-                    name=catalogue_setup.get('name'),
-                    version=catalogue_setup.get('version'),
-                    content_type_map=content_type_map,
-                    consent_type=catalogue_setup.get('consent_type'),
-                    start_datetime=catalogue_setup.get('start_datetime'),
-                    end_datetime=catalogue_setup.get('end_datetime'),
-                    add_for_app=catalogue_setup.get('add_for_app'),
-                    )
+                )
 
     def update_global(self):
-        """Creates or updates global configuration options in edc_configuration.
+        """Creates or updates global configuration options in app_configuration.
 
         First ensures defaults exist, then, if user specification exists, overwrites the defaults or adds new.
 
-        See sample edc_configuration where there is an attribute like this:
+        See sample app_configuration where there is an attribute like this:
 
             ...
             global_configuration = {
@@ -289,7 +240,7 @@ class BaseAppConfiguration(object):
         for configuration in configurations:
             for category_name, category_configuration in configuration.iteritems():
                 for attr, value in category_configuration.iteritems():
-                    string_value = force_text(value)
+                    string_value = datatype_to_string(value)
                     string_value = string_value.strip(' "')
                     try:
                         global_configuration = GlobalConfiguration.objects.get(attribute=attr)
@@ -316,3 +267,16 @@ class BaseAppConfiguration(object):
                 updated_holiday = Holiday.objects.get(holiday_name=holiday)
                 updated_holiday.holiday_date = self.holidays_setup.get(holiday)
                 updated_holiday.save()
+
+    def update_or_create_consent_type(self):
+        for item in self.consent_type_setup:
+            try:
+                consent_type = ConsentType.objects.get(
+                    version=item.get('version'),
+                    app_label=item.get('app_label'),
+                    model_name=item.get('model_name'))
+                consent_type.start_datetime = item.get('start_datetime')
+                consent_type.end_datetime = item.get('end_datetime')
+                consent_type.save()
+            except ConsentType.DoesNotExist:
+                ConsentType.objects.create(**item)

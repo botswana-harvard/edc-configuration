@@ -1,2 +1,0 @@
-from .global_configuration import GlobalConfiguration
-from .subject_configuration import SubjectConfiguration

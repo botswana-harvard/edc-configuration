@@ -1,2 +1,0 @@
-from .catalogue_configuration_factory import CatalogueConfigurationFactory
-from .variables_configuration_factory import VariblesConfigurationFactory
