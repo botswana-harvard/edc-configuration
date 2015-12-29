@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from edc_base.modeladmin.admin import BaseModelAdmin
 
-from ..models import GlobalConfiguration
+from .models import GlobalConfiguration
 
 
 class GlobalConfigurationAdmin(BaseModelAdmin):
