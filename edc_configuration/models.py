@@ -51,4 +51,4 @@ class GlobalConfiguration(BaseUuidModel):
     objects = ConfigurationManager()
 
     class Meta:
-        app_label = 'app_configuration'
+        app_label = 'edc_configuration'
