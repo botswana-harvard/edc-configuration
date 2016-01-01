@@ -43,7 +43,7 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'tastypie',
-    'edc.core.bhp_content_type_map',
+    'edc_content_type_map',
     'edc_appointment',
     'edc_audit',
     'edc_base',
