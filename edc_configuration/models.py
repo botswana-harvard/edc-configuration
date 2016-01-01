@@ -33,6 +33,7 @@ class GlobalConfiguration(BaseUuidModel):
 
     """
     category = models.CharField(max_length=50)
+
     attribute = models.CharField(
         max_length=50,
         unique=True,
@@ -41,11 +42,13 @@ class GlobalConfiguration(BaseUuidModel):
     value = models.CharField(
         max_length=50,
         help_text='any string value or string representation of a value')
+
     convert = models.BooleanField(
         default=True,
         help_text=('If True, automatically convert string value to its datatype. '
                    'Type is autodetected in this order: Boolean, None, Decimal, Integer, '
                    'Date, Datetime otherwise String'))
+
     comment = models.CharField(max_length=100)
 
     objects = ConfigurationManager()

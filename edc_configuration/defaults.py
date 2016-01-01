@@ -1,7 +1,7 @@
 default_global_configuration = {
     'dashboard': {
         'show_not_required_requisitions': True,
-        'show_not_required_scheduled_entries': True,
+        'show_not_required_crf_entries': True,
         'allow_additional_requisitions': False},
     'appointment': {
         'allowed_iso_weekdays': '1234567',
