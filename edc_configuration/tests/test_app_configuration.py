@@ -20,7 +20,7 @@ class TestAppConfiguration(BaseAppConfiguration):
     profile_model = TestProfile
     profile_item_model = TestProfileItem
 
-    global_configurations = {
+    global_configuration = {
         'appointment': {
             'allowed_iso_weekdays': ('2345', False),
             'use_same_weekday': False,
