@@ -50,12 +50,14 @@ INSTALLED_APPS = (
     'edc_configuration',
     'edc_consent',
     'edc_crypto_fields',
+    'edc_lab.lab_clinic_api',
     'edc_meta_data',
     'edc_quota',
     'edc_registration',
     'edc_rule_groups',
     'edc_sync',
     'edc_visit_schedule',
+    'edc_testing',
 )
 
 MIDDLEWARE_CLASSES = (

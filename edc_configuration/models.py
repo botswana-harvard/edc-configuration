@@ -3,7 +3,7 @@ from django.db import models
 
 from edc_base.model.models import BaseUuidModel
 
-from .utils import string_to_datatype
+from .convert import Convert
 
 
 class ConfigurationManager(models.Manager):
@@ -12,8 +12,8 @@ class ConfigurationManager(models.Manager):
         """Returns the attribute value in its original datatype assuming it can be converted."""
         try:
             obj = self.get(attribute=attribute_name)
-            string_value = obj.value.strip(' "')
-            return string_to_datatype(string_value) if obj.convert else string_value
+            string_value = obj.value
+            return Convert(string_value).to_value() if obj.convert else string_value
         except self.model.DoesNotExist:
             return ''
 

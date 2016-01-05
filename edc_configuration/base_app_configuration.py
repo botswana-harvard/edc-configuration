@@ -1,5 +1,7 @@
-from django.core.exceptions import MultipleObjectsReturned
+import pytz
 
+from django.core.exceptions import MultipleObjectsReturned
+from django.utils import timezone
 from edc.export.helpers import ExportHelper
 from edc.notification.helpers import NotificationHelper
 from edc_appointment.models import Holiday
@@ -12,31 +14,55 @@ from edc_meta_data.models import RequisitionPanel
 
 from lis.labeling.models import LabelPrinter, ZplTemplate, Client
 
+from .convert import Convert
 from .defaults import default_global_configuration
+from .exceptions import AppConfigurationError
 from .models import GlobalConfiguration
-from .utils import datatype_to_string
+
+# from django.utils.timezone import make_aware
 
 
 class BaseAppConfiguration(object):
 
+    aliquot_type_model = None
     appointment_configuration = None
     consent_catalogue_list = None
     consent_catalogue_setup = None
+    export_plan_setup = {}
+    holidays_setup = {}
     lab_clinic_api_setup = None
     lab_setup = None
+    labeling_setup = {}
+    notification_plan_setup = {}
+    panel_model = None
+    profile_item_model = None
+    profile_model = None
     study_site_setup = None
     study_variables_setup = None
-    export_plan_setup = {}
-    notification_plan_setup = {}
-    labeling_setup = {}
-    holidays_setup = {}
 
-    def __init__(self):
+    def __init__(self, lab_profiles=None, use_site_lab_profiles=None):
         self.confirm_site_code_in_settings = True
         self.confirm_community_in_settings = True
+        if True if use_site_lab_profiles is None else False:
+            lab_profiles = site_lab_profiles
+        try:
+            self.aliquot_type_model = lab_profiles.group_models.get('aliquot_type')
+            self.profile_model = lab_profiles.group_models.get('profile')
+            self.profile_item_model = lab_profiles.group_models.get('profile_item')
+            self.panel_model = lab_profiles.group_models.get('panel')
+        except AttributeError as e:
+            if 'group_models' not in str(e):
+                raise AttributeError(e)
+        model_classes = [
+            self.aliquot_type_model, self.profile_model, self.profile_item_model, self.panel_model]
+        if None in model_classes:
+            raise AppConfigurationError(
+                'Not all required lab model classes were specified for '
+                'app configuration. Got {}.'.format(model_classes))
 
     def prepare(self):
-        """Updates content type maps then runs each configuration method with the corresponding class attribute.
+        """Updates content type maps then runs each configuration method
+        with the corresponding class attribute.
 
         Configuration methods update default data in supporting tables."""
         ContentTypeMapHelper().populate()
@@ -72,99 +98,105 @@ class BaseAppConfiguration(object):
             except Panel.DoesNotExist:
                 panel = Panel.objects.create(name=item.name, panel_type=item.panel_type)
             # add aliquots to panel
-            # panel.aliquot_type.clear()
             aliquot_type = AliquotType.objects.get(alpha_code=item.aliquot_type_alpha_code)
             panel.aliquot_type.add(aliquot_type)
 
     def update_or_create_lab(self):
-        """Updates profiles and supporting list tables for site specific lab module (e.g. bcpp_lab, mpepu_lab, ...).
-
-        The supporting model classes Panel, AliquotType, Profile and ProfileItem
-        are fetched from the global site_lab_profiles."""
+        """Updates profiles and supporting list tables for site
+        specific lab module (e.g. bcpp_lab, mpepu_lab, ...)."""
 
         for setup_items in self.lab_setup.itervalues():
-            destination = site_lab_profiles.group_models.get('destination')
-            aliquot_type_model = site_lab_profiles.group_models.get('aliquot_type')
-            panel_model = site_lab_profiles.group_models.get('panel')
-            profile_model = site_lab_profiles.group_models.get('profile')
-            profile_item_model = site_lab_profiles.group_models.get('profile_item')
-            # update / create destination (shipping destination)
-            for item in setup_items.get('destination', []):
-                try:
-                    destination = Destination.objects.get(code=item.code)
-                    destination.name = item.name
-                    destination.address = item.address
-                    destination.tel = item.tel
-                    destination.email = item.email
-                    destination.save(update_fields=['name', 'address', 'tel', 'email'])
-                except Destination.DoesNotExist:
-                    Destination.objects.create(
-                        code=item.code,
-                        name=item.name,
-                        address=item.address,
-                        tel=item.tel,
-                        email=item.email)
-                except MultipleObjectsReturned:
-                    Destination.objects.filter(code=item.code).delete()
-                    Destination.objects.create(
-                        code=item.code,
-                        name=item.name,
-                        address=item.address,
-                        tel=item.tel,
-                        email=item.email)
-            # update / create aliquot_types
-            for item in setup_items.get('aliquot_type'):
-                try:
-                    aliquot_type = aliquot_type_model.objects.get(name=item.name)
-                    aliquot_type.alpha_code = item.alpha_code
-                    aliquot_type.numeric_code = item.numeric_code
-                    aliquot_type.save(update_fields=['alpha_code', 'numeric_code'])
-                except aliquot_type_model.DoesNotExist:
-                    aliquot_type_model.objects.create(name=item.name,
-                                                      alpha_code=item.alpha_code,
-                                                      numeric_code=item.numeric_code)
-            # update / create panels
-            for item in setup_items.get('panel'):
-                try:
-                    panel = panel_model.objects.get(name=item.name)
-                    panel.panel_type = item.panel_type
-                    panel.save(update_fields=['panel_type'])
-                except panel_model.DoesNotExist:
-                    panel = panel_model.objects.create(name=item.name,
-                                                       panel_type=item.panel_type)
-                # add aliquots to panel
-                panel.aliquot_type.clear()
-                aliquot_type = aliquot_type_model.objects.get(alpha_code=item.aliquot_type_alpha_code)
-                panel.aliquot_type.add(aliquot_type)
-                # create lab entry requisition panels based on this panel info
-                try:
-                    requisition_panel = RequisitionPanel.objects.get(name=item.name)
-                    requisition_panel.aliquot_type_alpha_code = item.aliquot_type_alpha_code
-                    requisition_panel.save(update_fields=['aliquot_type_alpha_code'])
-                except RequisitionPanel.DoesNotExist:
-                    requisition_panel = RequisitionPanel.objects.create(
-                        name=item.name, aliquot_type_alpha_code=item.aliquot_type_alpha_code)
-            # create profiles
-            for item in setup_items.get('profile'):
-                aliquot_type = aliquot_type_model.objects.get(alpha_code=item.alpha_code)
-                try:
-                    profile = profile_model.objects.get(name=item.profile_name)
-                    profile.aliquot_type = aliquot_type
-                    profile.save(update_fields=['aliquot_type'])
-                except profile_model.DoesNotExist:
-                    profile_model.objects.create(name=item.profile_name, aliquot_type=aliquot_type)
-            # add profile items
-            for item in setup_items.get('profile_item'):
-                profile = profile_model.objects.get(name=item.profile_name)
-                aliquot_type = aliquot_type_model.objects.get(alpha_code=item.alpha_code)
-                try:
-                    profile_item = profile_item_model.objects.get(profile=profile, aliquot_type=aliquot_type)
-                    profile_item.volume = item.volume
-                    profile_item.count = item.count
-                    profile_item.save(update_fields=['volume', 'count'])
-                except profile_item_model.DoesNotExist:
-                    profile_item_model.objects.create(
-                        profile=profile, aliquot_type=aliquot_type, volume=item.volume, count=item.count)
+            self.update_or_create_lab_destinations(setup_items)
+            self.update_or_create_lab_aliquot_types(setup_items)
+            self.update_or_create_lab_panels(setup_items)
+            self.update_or_create_lab_profiles(setup_items)
+
+    def update_or_create_lab_destinations(self, setup_items):
+        """Updates / creates destination (shipping destination)."""
+        for item in setup_items.get('destination', []):
+            try:
+                destination = Destination.objects.get(code=item.code)
+                destination.name = item.name
+                destination.address = item.address
+                destination.tel = item.tel
+                destination.email = item.email
+                destination.save(update_fields=['name', 'address', 'tel', 'email'])
+            except Destination.DoesNotExist:
+                Destination.objects.create(
+                    code=item.code,
+                    name=item.name,
+                    address=item.address,
+                    tel=item.tel,
+                    email=item.email)
+            except MultipleObjectsReturned:
+                Destination.objects.filter(code=item.code).delete()
+                Destination.objects.create(
+                    code=item.code,
+                    name=item.name,
+                    address=item.address,
+                    tel=item.tel,
+                    email=item.email)
+
+    def update_or_create_lab_aliquot_types(self, setup_items):
+        """Updates / creates aliquot_types."""
+        for item in setup_items.get('aliquot_type'):
+            try:
+                aliquot_type = self.aliquot_type_model.objects.get(name=item.name)
+                aliquot_type.alpha_code = item.alpha_code
+                aliquot_type.numeric_code = item.numeric_code
+                aliquot_type.save(update_fields=['alpha_code', 'numeric_code'])
+            except self.aliquot_type_model.DoesNotExist:
+                self.aliquot_type_model.objects.create(
+                    name=item.name,
+                    alpha_code=item.alpha_code,
+                    numeric_code=item.numeric_code)
+
+    def update_or_create_lab_panels(self, setup_items):
+        """Updates / creates panels and links them to aliquot_types."""
+        for item in setup_items.get('panel'):
+            try:
+                panel = self.panel_model.objects.get(name=item.name)
+                panel.panel_type = item.panel_type
+                panel.save(update_fields=['panel_type'])
+            except self.panel_model.DoesNotExist:
+                panel = self.panel_model.objects.create(
+                    name=item.name,
+                    panel_type=item.panel_type)
+            # add aliquots to panel
+            panel.aliquot_type.clear()
+            aliquot_type = self.aliquot_type_model.objects.get(alpha_code=item.aliquot_type_alpha_code)
+            panel.aliquot_type.add(aliquot_type)
+            # create lab entry requisition panels based on this panel info
+            try:
+                requisition_panel = RequisitionPanel.objects.get(name=item.name)
+                requisition_panel.aliquot_type_alpha_code = item.aliquot_type_alpha_code
+                requisition_panel.save(update_fields=['aliquot_type_alpha_code'])
+            except RequisitionPanel.DoesNotExist:
+                requisition_panel = RequisitionPanel.objects.create(
+                    name=item.name, aliquot_type_alpha_code=item.aliquot_type_alpha_code)
+
+    def update_or_create_lab_profiles(self, setup_items):
+        """ Updates / creates profiles."""
+        for item in setup_items.get('profile'):
+            aliquot_type = self.aliquot_type_model.objects.get(alpha_code=item.alpha_code)
+            try:
+                profile = self.profile_model.objects.get(name=item.profile_name)
+                profile.aliquot_type = aliquot_type
+                profile.save(update_fields=['aliquot_type'])
+            except self.profile_model.DoesNotExist:
+                self.profile_model.objects.create(name=item.profile_name, aliquot_type=aliquot_type)
+        # add profile items
+        for item in setup_items.get('profile_item'):
+            profile = self.profile_model.objects.get(name=item.profile_name)
+            aliquot_type = self.aliquot_type_model.objects.get(alpha_code=item.alpha_code)
+            try:
+                profile_item = self.profile_item_model.objects.get(profile=profile, aliquot_type=aliquot_type)
+                profile_item.volume = item.volume
+                profile_item.count = item.count
+                profile_item.save(update_fields=['volume', 'count'])
+            except self.profile_item_model.DoesNotExist:
+                self.profile_item_model.objects.create(
+                    profile=profile, aliquot_type=aliquot_type, volume=item.volume, count=item.count)
 
     def update_or_create_labeling(self):
         """Updates configuration in the :mod:`labeling` module."""
@@ -181,20 +213,20 @@ class BaseAppConfiguration(object):
                     cups_printer_name=printer_setup.cups_printer_name,
                     cups_server_hostname=printer_setup.cups_server_hostname,
                     cups_server_ip=printer_setup.cups_server_ip,
-                    default=printer_setup.default,
-                )
+                    default=printer_setup.default)
         for client_setup in self.labeling_setup.get('client', []):
             try:
                 client = Client.objects.get(name=client_setup.hostname)
-                client.label_printer = LabelPrinter.objects.get(cups_printer_name=client_setup.printer_name,
-                                                                cups_server_hostname=client_setup.cups_hostname)
+                client.label_printer = LabelPrinter.objects.get(
+                    cups_printer_name=client_setup.printer_name,
+                    cups_server_hostname=client_setup.cups_hostname)
                 client.save(update_fields=['label_printer'])
             except Client.DoesNotExist:
                 Client.objects.create(
                     name=client_setup.hostname,
-                    label_printer=LabelPrinter.objects.get(cups_printer_name=client_setup.printer_name,
-                                                           cups_server_hostname=client_setup.cups_hostname),
-                )
+                    label_printer=LabelPrinter.objects.get(
+                        cups_printer_name=client_setup.printer_name,
+                        cups_server_hostname=client_setup.cups_hostname))
         for zpl_template_setup in self.labeling_setup.get('zpl_template', []):
             try:
                 zpl_template = ZplTemplate.objects.get(name=zpl_template_setup.name)
@@ -205,8 +237,7 @@ class BaseAppConfiguration(object):
                 ZplTemplate.objects.create(
                     name=zpl_template_setup.name,
                     template=zpl_template_setup.template,
-                    default=zpl_template_setup.default,
-                )
+                    default=zpl_template_setup.default)
 
     def update_global(self):
         """Creates or updates global configuration options in app_configuration.
@@ -236,14 +267,15 @@ class BaseAppConfiguration(object):
         for configuration in configurations:
             for category_name, category_configuration in configuration.iteritems():
                 for attr, value in category_configuration.iteritems():
-                    string_value = datatype_to_string(value)
+                    string_value = Convert(value).to_string()
                     string_value = string_value.strip(' "')
                     try:
                         global_configuration = GlobalConfiguration.objects.get(attribute=attr)
                         global_configuration.value = string_value
                         global_configuration.save()
                     except GlobalConfiguration.DoesNotExist:
-                        GlobalConfiguration.objects.create(category=category_name, attribute=attr, value=string_value)
+                        GlobalConfiguration.objects.create(
+                            category=category_name, attribute=attr, value=string_value)
 
     def update_export_plan_setup(self):
         if self.export_plan_setup:
@@ -266,6 +298,8 @@ class BaseAppConfiguration(object):
 
     def update_or_create_consent_type(self):
         for item in self.consent_type_setup:
+            item['start_datetime'] = self.localize(item.get('start_datetime'))
+            item['end_datetime'] = self.localize(item.get('end_datetime'))
             try:
                 consent_type = ConsentType.objects.get(
                     version=item.get('version'),
@@ -276,3 +310,7 @@ class BaseAppConfiguration(object):
                 consent_type.save()
             except ConsentType.DoesNotExist:
                 ConsentType.objects.create(**item)
+
+    def localize(self, datetime_obj):
+        default_timezone = timezone.get_default_timezone_name()
+        return pytz.timezone(default_timezone).localize(datetime_obj)
