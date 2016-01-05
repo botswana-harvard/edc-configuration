@@ -28,7 +28,7 @@ class BaseAppConfiguration(object):
     appointment_configuration = None
     consent_type_setup = None
     export_plan_setup = {}
-    global_configurations = None
+    global_configuration = {}
     holidays_setup = {}
     lab_clinic_api_setup = None
     lab_setup = None
@@ -37,12 +37,11 @@ class BaseAppConfiguration(object):
     panel_model = None
     profile_item_model = None
     profile_model = None
-    study_site_setup = None
 
     def __init__(self, lab_profiles=None, use_site_lab_profiles=None):
         self.confirm_site_code_in_settings = True
         self.confirm_community_in_settings = True
-        if True if use_site_lab_profiles is None else False:
+        if True if use_site_lab_profiles is None else use_site_lab_profiles:
             lab_profiles = site_lab_profiles
         try:
             self.aliquot_type_model = lab_profiles.group_models.get('aliquot_type')
@@ -57,7 +56,8 @@ class BaseAppConfiguration(object):
         if None in model_classes:
             raise AppConfigurationError(
                 'Not all required lab model classes were specified for '
-                'app configuration. Got {}.'.format(model_classes))
+                'in the configuration. Either pass \'lab_profiles=site_lab_profiles\' or '
+                'explicitly declare the models on the class. Got {}.'.format(model_classes))
 
     def prepare(self):
         """Updates content type maps then runs each configuration method
@@ -283,7 +283,7 @@ class BaseAppConfiguration(object):
         by global_configurations."""
 
         configuration = deepcopy(default_global_configuration)
-        for category, config in self.global_configurations.iteritems():
+        for category, config in self.global_configuration.iteritems():
             if configuration.get(category):
                 for key, value in config.iteritems():
                     configuration[category].update({key: value})
