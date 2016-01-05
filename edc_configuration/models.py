@@ -12,8 +12,7 @@ class ConfigurationManager(models.Manager):
         """Returns the attribute value in its original datatype assuming it can be converted."""
         try:
             obj = self.get(attribute=attribute_name)
-            string_value = obj.value
-            return Convert(string_value).to_value() if obj.convert else string_value
+            return Convert(obj.value, convert=obj.convert).to_value()
         except self.model.DoesNotExist:
             return ''
 

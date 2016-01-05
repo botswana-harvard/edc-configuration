@@ -58,6 +58,7 @@ INSTALLED_APPS = (
     'edc_sync',
     'edc_visit_schedule',
     'edc_testing',
+    'lis.labeling',
 )
 
 MIDDLEWARE_CLASSES = (

@@ -1,7 +1,7 @@
-import pytz
+from copy import deepcopy
 
 from django.core.exceptions import MultipleObjectsReturned
-from django.utils import timezone
+from django.conf import settings
 from edc.export.helpers import ExportHelper
 from edc.notification.helpers import NotificationHelper
 from edc_appointment.models import Holiday
@@ -14,7 +14,7 @@ from edc_meta_data.models import RequisitionPanel
 
 from lis.labeling.models import LabelPrinter, ZplTemplate, Client
 
-from .convert import Convert
+from .convert import Convert, localize
 from .defaults import default_global_configuration
 from .exceptions import AppConfigurationError
 from .models import GlobalConfiguration
@@ -26,9 +26,9 @@ class BaseAppConfiguration(object):
 
     aliquot_type_model = None
     appointment_configuration = None
-    consent_catalogue_list = None
-    consent_catalogue_setup = None
+    consent_type_setup = None
     export_plan_setup = {}
+    global_configurations = None
     holidays_setup = {}
     lab_clinic_api_setup = None
     lab_setup = None
@@ -38,7 +38,6 @@ class BaseAppConfiguration(object):
     profile_item_model = None
     profile_model = None
     study_site_setup = None
-    study_variables_setup = None
 
     def __init__(self, lab_profiles=None, use_site_lab_profiles=None):
         self.confirm_site_code_in_settings = True
@@ -259,23 +258,38 @@ class BaseAppConfiguration(object):
             ...
 
         """
-        configurations = [default_global_configuration]
-        try:
-            configurations.append(self.global_configuration)
-        except AttributeError:
-            pass   # maybe attribute does not exist
-        for configuration in configurations:
-            for category_name, category_configuration in configuration.iteritems():
-                for attr, value in category_configuration.iteritems():
-                    string_value = Convert(value).to_string()
-                    string_value = string_value.strip(' "')
-                    try:
-                        global_configuration = GlobalConfiguration.objects.get(attribute=attr)
-                        global_configuration.value = string_value
-                        global_configuration.save()
-                    except GlobalConfiguration.DoesNotExist:
-                        GlobalConfiguration.objects.create(
-                            category=category_name, attribute=attr, value=string_value)
+        for category_name, category_configuration in self.configurations.iteritems():
+            for attr, value in category_configuration.iteritems():
+                try:
+                    value, convert = value
+                except (ValueError, TypeError):
+                    value, convert = value, True
+                convert = Convert(value, convert)
+                string_value = convert.to_string()
+                try:
+                    global_configuration = GlobalConfiguration.objects.get(attribute=attr)
+                    global_configuration.value = string_value
+                    global_configuration.convert = convert.convert
+                    global_configuration.save()
+                except GlobalConfiguration.DoesNotExist:
+                    GlobalConfiguration.objects.create(
+                        category=category_name, attribute=attr, value=string_value, convert=convert.convert)
+
+    @property
+    def configurations(self):
+        """Returns a dictionary of configurations to be used to update GlobalConfiguration model.
+
+        Starts with the default_global_configuration and updates or adds any items changed
+        by global_configurations."""
+
+        configuration = deepcopy(default_global_configuration)
+        for category, config in self.global_configurations.iteritems():
+            if configuration.get(category):
+                for key, value in config.iteritems():
+                    configuration[category].update({key: value})
+            else:
+                configuration[category] = config
+        return configuration
 
     def update_export_plan_setup(self):
         if self.export_plan_setup:
@@ -298,8 +312,9 @@ class BaseAppConfiguration(object):
 
     def update_or_create_consent_type(self):
         for item in self.consent_type_setup:
-            item['start_datetime'] = self.localize(item.get('start_datetime'))
-            item['end_datetime'] = self.localize(item.get('end_datetime'))
+            if settings.USE_TZ:
+                item['start_datetime'] = localize(item.get('start_datetime'))
+                item['end_datetime'] = localize(item.get('end_datetime'))
             try:
                 consent_type = ConsentType.objects.get(
                     version=item.get('version'),
@@ -310,7 +325,3 @@ class BaseAppConfiguration(object):
                 consent_type.save()
             except ConsentType.DoesNotExist:
                 ConsentType.objects.create(**item)
-
-    def localize(self, datetime_obj):
-        default_timezone = timezone.get_default_timezone_name()
-        return pytz.timezone(default_timezone).localize(datetime_obj)
