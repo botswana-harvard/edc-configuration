@@ -2,7 +2,7 @@
 
 This prepares Edc specific variables from a oconfiguration file in the project.
 
-A configuration file is read when the `urls.py` is loaded. The values are written to model `GlobalConfiguration` and a few other models such as `edc_consent.consent_type`, `edc_appointment`, `lis.labeling`, `edc.export`, `edc.notification`, and others.
+A configuration file is read when the `urls.py` is loaded. The values are written to model `GlobalConfiguration` and a few other models such as `edc_consent.consent_type`, `edc_appointment`, `lis.labeling`, `edc_export`, `edc.notification`, and others.
 
 Having this file keeps the values in these models static across multiple instances of the project. In our case we have many offline clients that must be configured identically.
 

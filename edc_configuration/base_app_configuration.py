@@ -2,7 +2,7 @@ from copy import deepcopy
 
 from django.core.exceptions import MultipleObjectsReturned
 from django.conf import settings
-from edc.export.helpers import ExportHelper
+from edc_export.helpers import ExportHelper
 from edc.notification.helpers import NotificationHelper
 from edc_appointment.models import Holiday
 from edc_consent.models import ConsentType
