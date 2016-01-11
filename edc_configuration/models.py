@@ -16,6 +16,20 @@ class ConfigurationManager(models.Manager):
         except self.model.DoesNotExist:
             return ''
 
+    def set_attr(self, attribute_name, value, convert=None):
+        """Sets the attribute value."""
+        convert = True if convert is None else convert
+        try:
+            obj = self.get(attribute=attribute_name)
+            obj.value = value
+            obj.convert = convert
+            obj.save()
+        except self.model.DoesNotExist:
+            self.create(
+                attribute=attribute_name,
+                value=value,
+                convert=convert)
+
 
 class GlobalConfiguration(BaseUuidModel):
     """A model to store any configurations values for reference in the edc and other models.
