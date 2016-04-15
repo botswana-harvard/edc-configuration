@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/1.8/ref/settings/
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 
 import os
+import django
 
 from django.utils import timezone
 
@@ -35,32 +36,35 @@ ALLOWED_HOSTS = []
 # Application definition
 
 
-INSTALLED_APPS = (
+INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'tastypie',
     'edc_content_type_map',
     'edc_appointment',
-    'edc_audit',
     'edc_base',
     'edc_configuration',
     'edc_consent',
-    'edc_crypto_fields',
     'edc_export',
     'edc_lab.lab_clinic_api',
+    'edc_lab.lab_clinic_reference',
     'edc_meta_data',
-    'edc_quota',
+    'tastypie',
     'edc_registration',
     'edc_rule_groups',
     'edc_sync',
     'edc_visit_schedule',
     'edc_testing',
     'lis.labeling',
-)
+    'lab_requisition'
+]
+
+if float(django.get_version()) > 1.6:
+    INSTALLED_APPS.append('simple_history')
+    INSTALLED_APPS.append('django_crypto_fields')
 
 MIDDLEWARE_CLASSES = (
     'django.contrib.sessions.middleware.SessionMiddleware',
