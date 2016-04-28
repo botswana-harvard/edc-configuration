@@ -105,7 +105,7 @@ class BaseAppConfiguration(object):
         """Updates profiles and supporting list tables for site
         specific lab module (e.g. bcpp_lab, mpepu_lab, ...)."""
 
-        for setup_items in self.lab_setup.itervalues():
+        for setup_items in self.lab_setup.values():
             self.update_or_create_lab_destinations(setup_items)
             self.update_or_create_lab_aliquot_types(setup_items)
             self.update_or_create_lab_panels(setup_items)
@@ -259,8 +259,8 @@ class BaseAppConfiguration(object):
             ...
 
         """
-        for category_name, category_configuration in self.configurations.iteritems():
-            for attr, value in category_configuration.iteritems():
+        for category_name, category_configuration in self.configurations.items():
+            for attr, value in category_configuration.items():
                 try:
                     value, convert = value
                 except (ValueError, TypeError):
@@ -284,9 +284,9 @@ class BaseAppConfiguration(object):
         by global_configurations."""
 
         configuration = deepcopy(default_global_configuration)
-        for category, config in self.global_configuration.iteritems():
+        for category, config in self.global_configuration.items():
             if configuration.get(category):
-                for key, value in config.iteritems():
+                for key, value in config.items():
                     configuration[category].update({key: value})
             else:
                 configuration[category] = config
