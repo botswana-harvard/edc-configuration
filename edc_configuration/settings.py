@@ -13,9 +13,8 @@ https://docs.djangoproject.com/en/1.8/ref/settings/
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 
 import os
+import sys
 import django
-
-from django.utils import timezone
 
 from unipath import Path
 
@@ -43,28 +42,30 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'edc_content_type_map',
-    'edc_appointment',
+    'django_crypto_fields',
+    'simple_history',
     'edc_base',
-    'edc_configuration',
-    'edc_consent',
-    'edc_export',
-    'edc_lab.lab_clinic_api',
-    'edc_lab.lab_clinic_reference',
+    'edc_content_type_map',
     'edc_meta_data',
-    'tastypie',
     'edc_registration',
-    'edc_rule_groups',
-    'edc_sync',
+    'edc_appointment',
     'edc_visit_schedule',
-    'edc_testing',
-    'lis.labeling',
-    'lab_requisition'
+    'edc_configuration',
 ]
 
-if float(django.get_version()) > 1.6:
-    INSTALLED_APPS.append('simple_history')
-    INSTALLED_APPS.append('django_crypto_fields')
+if 'test' in sys.argv:
+    INSTALLED_APPS = INSTALLED_APPS + [
+        'edc_consent',
+        'edc_export',
+        'edc_lab.lab_clinic_api',
+        'edc_lab.lab_clinic_reference',
+        'tastypie',
+        'edc_rule_groups',
+        'edc_sync',
+        'edc_testing',
+        'lis.labeling',
+        'lab_requisition'
+    ]
 
 MIDDLEWARE_CLASSES = (
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -129,19 +130,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 GIT_DIR = BASE_DIR.ancestor(1)
-
 KEY_PATH = os.path.join(BASE_DIR.ancestor(1), 'crypto_fields')
-
-PROJECT_ROOT = GIT_DIR
-FIELD_MAX_LENGTH = 'default'
-IS_SECURE_DEVICE = True
-KEY_PREFIX = 'user'
-ALLOW_MODEL_SERIALIZATION = True
-MIN_AGE_OF_CONSENT = None
-STUDY_OPEN_DATETIME = timezone.datetime(2013, 10, 18)
-DEVICE_ID = '99'
-SERVER_DEVICE_ID_LIST = ['99']
-MIDDLEMAN_DEVICE_ID_LIST = []
 LANGUAGES = (
     ('tn', 'Setswana'),
     ('en', 'English'))
