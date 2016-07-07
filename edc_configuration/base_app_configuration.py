@@ -4,7 +4,7 @@ from django.core.exceptions import MultipleObjectsReturned
 from django.conf import settings
 
 from edc_appointment.models import Holiday
-from edc_consent.models import ConsentType
+from edc_consent.consent_type import ConsentType
 from edc_content_type_map.models import ContentTypeMapHelper
 from edc_export.helpers import ExportHelper
 from edc_lab.lab_clinic_api.models import AliquotType, Panel
