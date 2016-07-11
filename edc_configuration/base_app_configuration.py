@@ -68,7 +68,7 @@ class BaseAppConfiguration(object):
         ContentTypeMapHelper().populate()
         ContentTypeMapHelper().sync()
         self.update_global()
-        self.update_or_create_consent_type()
+        #self.update_or_create_consent_type()
         self.update_or_create_lab_clinic_api()
         self.update_or_create_lab()
         self.update_or_create_labeling()
